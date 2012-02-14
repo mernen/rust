@@ -323,6 +323,9 @@ fn Load(cx: @block_ctxt, PointerVal: ValueRef) -> ValueRef {
 
 fn Store(cx: @block_ctxt, Val: ValueRef, Ptr: ValueRef) {
     if cx.unreachable { ret; }
+    #debug["Store %s -> %s",
+           val_str(bcx_ccx(cx).tn, Val),
+           val_str(bcx_ccx(cx).tn, Ptr)];
     llvm::LLVMBuildStore(B(cx), Val, Ptr);
 }
 

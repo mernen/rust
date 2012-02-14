@@ -145,7 +145,7 @@ impl serialize_ctx for serialize_ctx {
     // Returns an AST fragment that names this function.
     fn serialize_ty(ty0: ty::t, v: ast_expr) -> ast_expr {
         let fname = self.mk_serialize_ty_fn(ty0);
-        #fmt["%s(cx, %s)", fname, v]
+        #fmt["%s(s, %s)", fname, v]
     }
 
     fn mk_serialize_ty_fn(ty0: ty::t) -> str {
@@ -166,11 +166,29 @@ impl serialize_ctx for serialize_ctx {
 
         let body_node = alt ty::get(ty0).struct {
           ty::ty_nil | ty::ty_bot { "()" }
-          ty::ty_int(_) { #fmt["s.emit_i64(%s as i64)", v] }
-          ty::ty_uint(_) { #fmt["s.emit_u64(%s as u64)", v] }
-          ty::ty_float(_) { #fmt["s.emit_f64(%s as f64)", v] }
+
+          ty::ty_int(ast::ty_i)   { #fmt["s.emit_i64(%s as i64)", v] }
+          ty::ty_int(ast::ty_i64) { #fmt["s.emit_i64(%s)", v] }
+          ty::ty_int(ast::ty_i32) { #fmt["s.emit_i32(%s)", v] }
+          ty::ty_int(ast::ty_i16) { #fmt["s.emit_i16(%s)", v] }
+          ty::ty_int(ast::ty_i8)  { #fmt["s.emit_i8(%s)", v]  }
+
+          ty::ty_int(ast::ty_char) { #fmt["s.emit_i8(%s as i8)", v] }
+
+          ty::ty_uint(ast::ty_u)   { #fmt["s.emit_u64(%s as u64)", v] }
+          ty::ty_uint(ast::ty_u64) { #fmt["s.emit_u64(%s)", v] }
+          ty::ty_uint(ast::ty_u32) { #fmt["s.emit_u32(%s)", v] }
+          ty::ty_uint(ast::ty_u16) { #fmt["s.emit_u16(%s)", v] }
+          ty::ty_uint(ast::ty_u8)  { #fmt["s.emit_u8(%s)", v]  }
+
+          ty::ty_float(ast::ty_f64) { #fmt["s.emit_f64(%s)", v] }
+          ty::ty_float(ast::ty_f32) { #fmt["s.emit_f32(%s)", v] }
+          ty::ty_float(ast::ty_f)   { #fmt["s.emit_f64(%s as f64)", v] }
+
           ty::ty_bool { #fmt["s.emit_bool(%s)", v] }
+
           ty::ty_str { #fmt["s.emit_str(%s)", v] }
+
           ty::ty_enum(def_id, tps) { self.serialize_enum(v, def_id, tps) }
           ty::ty_box(mt) {
             let s = self.serialize_ty(mt.ty, #fmt["*%s", v]);
@@ -181,12 +199,10 @@ impl serialize_ctx for serialize_ctx {
             #fmt["s.emit_uniq({||%s})", s]
           }
           ty::ty_vec(mt) {
-            let selem = self.serialize_ty(mt.ty, "i");
+            let selem = self.serialize_ty(mt.ty, "e");
             #fmt["s.emit_vec(vec::len(v), {|| \
-                  uint::range(0, vec::len(v), {|i| \
-                  s.emit_vec_elt(i, {||\
-                  %s;\
-                  })})})", selem]
+                    vec::iteri(v, {|i, e|\
+                      s.emit_vec_elt(i, {||%s;})})})", selem]
           }
           ty::ty_class(_, _) {
             fail "TODO--implement class";
@@ -250,18 +266,18 @@ impl serialize_ctx for serialize_ctx {
             idx += 1u;
 
             #fmt["%s { \
-                    s.emit_enum_variant(\"%s\", %uu, %uu) {||\
+                    s.emit_enum_variant(\"%s\", %uu, %uu, {||\
                       %s \
-                    } \
+                    }) \
                   }", v_pat, v_path, v_id, n_args, self.blk(stmts)]
         };
 
         let enum_name = ast_map::path_to_str(ty::item_path(self.tcx, id));
-        #fmt["s.emit_enum(\"%s\") {||\
+        #fmt["s.emit_enum(\"%s\", {||\
                 alt %s { \
                   %s \
                 }\
-              }", enum_name, v, str::connect(arms, "\n")]
+              })", enum_name, v, str::connect(arms, "\n")]
     }
 
     fn serialize_arm(v_path: str, emit_fn: str, args: [ty::t])

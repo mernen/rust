@@ -119,6 +119,7 @@ mod metadata {
     mod common;
     mod tyencode;
     mod tydecode;
+    mod astencode;
     mod encoder;
     mod decoder;
     mod creader;

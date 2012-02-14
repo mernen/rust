@@ -42,14 +42,14 @@ fn lookup_hash(d: ebml::doc, eq_fn: fn@([u8]) -> bool, hash: uint) ->
     let index = ebml::get_doc(d, tag_index);
     let table = ebml::get_doc(index, tag_index_table);
     let hash_pos = table.start + hash % 256u * 4u;
-    let pos = ebml::be_u64_from_bytes(d.data, hash_pos, 4u) as uint;
+    let pos = io::u64_from_be_bytes(*d.data, hash_pos, 4u) as uint;
     let {tag:_, doc:bucket} = ebml::doc_at(d.data, pos);
     // Awkward logic because we can't ret from foreach yet
 
     let result: [ebml::doc] = [];
     let belt = tag_index_buckets_bucket_elt;
     ebml::tagged_docs(bucket, belt) {|elt|
-        let pos = ebml::be_u64_from_bytes(elt.data, elt.start, 4u) as uint;
+        let pos = io::u64_from_be_bytes(*elt.data, elt.start, 4u) as uint;
         if eq_fn(vec::slice::<u8>(*elt.data, elt.start + 4u, elt.end)) {
             result += [ebml::doc_at(d.data, pos).doc];
         }
@@ -59,7 +59,7 @@ fn lookup_hash(d: ebml::doc, eq_fn: fn@([u8]) -> bool, hash: uint) ->
 
 fn maybe_find_item(item_id: int, items: ebml::doc) -> option<ebml::doc> {
     fn eq_item(bytes: [u8], item_id: int) -> bool {
-        ret ebml::be_u64_from_bytes(@bytes, 0u, 4u) as int == item_id;
+        ret io::u64_from_be_bytes(bytes, 0u, 4u) as int == item_id;
     }
     let eqer = bind eq_item(_, item_id);
     let found = lookup_hash(items, eqer, hash_node_id(item_id));
@@ -95,13 +95,8 @@ fn variant_enum_id(d: ebml::doc) -> ast::def_id {
 }
 
 fn variant_disr_val(d: ebml::doc) -> option<int> {
-    alt ebml::maybe_get_doc(d, tag_disr_val) {
-      some(val_doc) {
-        let val_buf = ebml::doc_data(val_doc);
-        let val = int::parse_buf(val_buf, 10u);
-        ret some(val);
-      }
-      _ { ret none;}
+    option::map(ebml::maybe_get_doc(d, tag_disr_val)) {|val_doc|
+        ebml::doc_as_i32(val_doc) as int
     }
 }
 
@@ -183,17 +178,17 @@ fn item_path(item_doc: ebml::doc) -> ast_map::path {
     let path_doc = ebml::get_doc(item_doc, tag_path);
 
     let len_doc = ebml::get_doc(path_doc, tag_path_len);
-    let len = ebml::doc_as_vuint(len_doc);
+    let len = ebml::doc_as_u32(len_doc) as uint;
 
     let result = [];
     vec::reserve(result, len);
 
     ebml::docs(path_doc) {|tag, elt_doc|
         if tag == tag_path_elt_mod {
-            let str = ebml::doc_str(elt_doc);
+            let str = ebml::doc_as_str(elt_doc);
             result += [ast_map::path_mod(str)];
         } else if tag == tag_path_elt_name {
-            let str = ebml::doc_str(elt_doc);
+            let str = ebml::doc_as_str(elt_doc);
             result += [ast_map::path_name(str)];
         } else {
             // ignore tag_path_len element
@@ -355,7 +350,7 @@ fn family_names_type(fam_ch: u8) -> bool {
 
 fn read_path(d: ebml::doc) -> {path: str, pos: uint} {
     let desc = ebml::doc_data(d);
-    let pos = ebml::be_u64_from_bytes(@desc, 0u, 4u) as uint;
+    let pos = io::u64_from_be_bytes(desc, 0u, 4u) as uint;
     let pathbytes = vec::slice::<u8>(desc, 4u, vec::len::<u8>(desc));
     let path = str::from_bytes(pathbytes);
     ret {path: path, pos: pos};

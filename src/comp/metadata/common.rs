@@ -30,6 +30,8 @@ const tag_items_data_item_variant: uint = 0x0eu;
 
 const tag_items_data_item_enum_id: uint = 0x0fu;
 
+const tag_items_data_ast: uint = 0x10u;
+
 const tag_index: uint = 0x11u;
 
 const tag_index_buckets: uint = 0x12u;
